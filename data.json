@@ -1,0 +1,19 @@
+{
+  "adminInfo": {
+    "id": "sodapam",
+    "password": "Kit107669!",
+    "name": "sodapam",
+    "email": "sodapam@naver.com",
+    "photo": "https://picsum.photos/200",
+    "bio": "Curating the best travel experiences across Jakarta, from historical landmarks to modern city life."
+  },
+  "posts": {
+    "initial_post_01": {
+      "title": "Welcome to Jakarta Journal",
+      "cat": "Culture",
+      "img": "https://picsum.photos/800/500?random=1",
+      "desc": "This is your first administrator post. Exploring the vibrant fusion of tradition and modernity in Indonesia.",
+      "date": "Feb 23, 2026"
+    }
+  }
+}

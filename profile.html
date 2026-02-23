@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Profile | Jakarta Journal</title>
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        :root{--primary-batik:#D4AF37;--jungle-dark:#0D140F;--card-bg:#1A231C;--text-main:#E0E0E0}
+        body{font-family:'Pretendard',sans-serif;background-color:var(--jungle-dark);color:var(--text-main);display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0; padding: 20px 0;}
+        .profile-card{background:var(--card-bg);padding:40px;border-radius:15px;width:100%;max-width:400px;border:1px solid var(--primary-batik);box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+        h2{color:var(--primary-batik);margin-top:0;text-align:center}
+        h3{color:var(--primary-batik); font-size: 0.9rem; margin-top: 20px; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        
+        /* 비밀번호 입력창 컨테이너 */
+        .pw-wrapper { position: relative; width: 100%; }
+        input,textarea{width:100%;padding:12px;margin:10px 0;background:#0d140f;border:1px solid #333;color:#fff;border-radius:5px;box-sizing:border-box}
+        input:focus{outline: none; border-color: var(--primary-batik);}
+        
+        /* 눈 아이콘 스타일 */
+        .eye-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #666;
+            transition: color 0.3s;
+        }
+        .eye-btn:hover { color: var(--primary-batik); }
+
+        .btn-save{width:100%;background:var(--primary-batik);border:none;padding:12px;border-radius:5px;font-weight:bold;cursor:pointer;margin-top:20px}
+        .btn-back{width:100%;background:none;border:none;color:#666;margin-top:15px;cursor:pointer}
+        .preview-img{width:80px;height:80px;border-radius:50%;display:block;margin:0 auto 20px;border:2px solid var(--primary-batik);object-fit:cover}
+    </style>
+</head>
+<body>
+    <div class="profile-card">
+        <h2>Edit Admin Profile</h2>
+        <img id="currentImg" class="preview-img" src="https://picsum.photos/80">
+        
+        <h3>Basic Information</h3>
+        <input type="text" id="adminName" placeholder="Admin Name">
+        <input type="text" id="adminPhoto" placeholder="Profile Image URL" onchange="document.getElementById('currentImg').src=this.value">
+        <textarea id="adminBio" rows="3" placeholder="Short Bio"></textarea>
+
+        <h3>Security (Password Change)</h3>
+        
+        <div class="pw-wrapper">
+            <input type="password" id="currentPw" placeholder="Current Password">
+            <i data-lucide="eye" class="eye-btn" onclick="togglePw('currentPw', this)"></i>
+        </div>
+
+        <div class="pw-wrapper">
+            <input type="password" id="newPw" placeholder="New Password">
+            <i data-lucide="eye" class="eye-btn" onclick="togglePw('newPw', this)"></i>
+        </div>
+
+        <div class="pw-wrapper">
+            <input type="password" id="confirmPw" placeholder="Confirm New Password">
+            <i data-lucide="eye" class="eye-btn" onclick="togglePw('confirmPw', this)"></i>
+        </div>
+        
+        <button class="btn-save" onclick="saveProfile()">SAVE CHANGES</button>
+        <button class="btn-back" onclick="location.href='index.html'">← Back to Blog</button>
+    </div>
+
+    <script>
+        const firebaseConfig = { databaseURL: "https://jakarta-blog-default-rtdb.firebaseio.com" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let cachedAdminData = null;
+
+        // 1. 관리자 권한 체크
+        if(sessionStorage.getItem('admin') !== 'true') {
+            alert('Access Denied');
+            location.href = 'index.html';
+        }
+
+        // 2. 기존 정보 불러오기
+        db.ref('adminInfo').once('value', (snap) => {
+            const data = snap.val();
+            if(data) {
+                cachedAdminData = data;
+                document.getElementById('adminName').value = data.name || '';
+                document.getElementById('adminPhoto').value = data.photo || '';
+                document.getElementById('adminBio').value = data.bio || '';
+                if(data.photo) document.getElementById('currentImg').src = data.photo;
+            }
+        });
+
+        // 비밀번호 보이기/숨기기 토글
+        function togglePw(inputId, icon) {
+            const target = document.getElementById(inputId);
+            if(target.type === 'password') {
+                target.type = 'text';
+                icon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                target.type = 'password';
+                icon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons(); // 아이콘 재렌더링
+        }
+
+        // 3. 프로필 및 비밀번호 저장
+        async function saveProfile() {
+            const name = document.getElementById('adminName').value;
+            const photo = document.getElementById('adminPhoto').value;
+            const bio = document.getElementById('adminBio').value;
+            
+            const currentPwInput = document.getElementById('currentPw').value;
+            const newPwInput = document.getElementById('newPw').value;
+            const confirmPwInput = document.getElementById('confirmPw').value;
+
+            let updateData = { ...cachedAdminData, name, photo, bio };
+
+            if (newPwInput || currentPwInput || confirmPwInput) {
+                if (currentPwInput !== cachedAdminData.password) {
+                    alert('현재 비밀번호가 일치하지 않습니다.');
+                    return;
+                }
+                if (newPwInput !== confirmPwInput) {
+                    alert('새 비밀번호와 확인 비밀번호가 서로 다릅니다.');
+                    return;
+                }
+                if (!newPwInput) {
+                    alert('새로 사용할 비밀번호를 입력해주세요.');
+                    return;
+                }
+                updateData.password = newPwInput;
+            }
+
+            db.ref('adminInfo').set(updateData).then(() => {
+                alert('프로필 정보가 성공적으로 변경되었습니다.');
+                location.href = 'index.html';
+            }).catch(err => {
+                alert('저장 중 오류가 발생했습니다: ' + err.message);
+            });
+        }
+
+        // 아이콘 초기화
+        lucide.createIcons();
+    </script>
+</body>
+</html>
