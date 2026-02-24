@@ -2,19 +2,19 @@ const firebaseConfig = { databaseURL: "https://jakarta-blog-default-rtdb.firebas
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let userIP = ""; // 사용자의 IP 저장 변수
+let userIP = ""; 
+let staticPosts = {}; // posts.json 데이터를 담을 변수
 
 // --- [공통 및 유틸리티] ---
 const openLogin = () => document.getElementById('loginModal').style.display = 'flex';
 const openPostModal = () => document.getElementById('postModal').style.display = 'flex';
 const closeModal = id => document.getElementById(id).style.display = 'none';
 
-// 사용자 IP 가져오기 (중복 방지용)
 async function getUserIP() {
     try {
         const res = await fetch('https://api.ipify.org?format=json');
         const data = await res.json();
-        userIP = data.ip.replace(/\./g, '_'); // Firebase 키에 .이 들어갈 수 없어 _로 변환
+        userIP = data.ip.replace(/\./g, '_');
     } catch (e) {
         userIP = "unknown_user";
     }
@@ -30,64 +30,82 @@ function setRandomHero() {
     hero.style.backgroundImage = `url('${imageUrl}')`;
 }
 
-function loadPosts() {
-    // 1. 페이지 최상단으로 부드럽게 이동
+// 통합 로드 함수: JSON 파일 읽기 + Firebase 동적 데이터 매칭
+async function loadPosts() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // 2. 히로 섹션(배너) 복구
     const hero = document.getElementById('mainHero');
     if (hero) {
-        hero.style.height = '85vh'; // 메인 배너 높이로 복구
+        hero.style.height = '85vh';
         hero.querySelector('.hero-title').innerText = "Wonderful Jakarta";
         hero.querySelector('.hero-subtitle').innerText = "Exploring the vibrant fusion of heritage and high-rise.";
-        // 필요하다면 배경 이미지도 새로 고침
         setRandomHero(); 
     }
 
-    // 3. 데이터 로딩 및 리스트 출력
-    db.ref('posts').once('value', snap => {
-        const allPosts = snap.val() || {};
-        let html = '';
-        
-        // 최신글 순으로 정렬
-        Object.keys(allPosts).reverse().forEach(key => {
-            const p = allPosts[key];
-            const likes = p.likes || 0;
-            const comments = p.comments ? Object.keys(p.comments).length : 0;
-            
-            html += `
-            <article class="post-card" onclick="viewPost('${key}')" style="cursor:pointer;">
-                <div class="post-image" style="background-image:url('${p.img}')"></div>
-                <div class="post-info">
-                    <span class="post-cat-tag">${p.cat}</span>
-                    <h3 class="post-list-title">${p.title}</h3>
-                    <p class="post-list-desc">${p.desc.replace(/<[^>]*>?/gm, '').substring(0, 130)}...</p>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
-                        <small style="color:var(--text-muted); font-size:0.75rem;">${p.date}</small>
-                        <div style="font-size:0.8rem; color:var(--primary-batik);">
-                            <span style="margin-right:10px;">❤ ${likes}</span>
-                            <span>💬 ${comments}</span>
-                        </div>
-                    </div>
-                </div>
-            </article>`;
+    try {
+        // 1. 정적 JSON 파일 가져오기
+        const response = await fetch('assets/data/posts.json');
+        staticPosts = await response.json();
+
+        // 2. Firebase에서 동적 데이터(좋아요, 댓글) 가져오기
+        db.ref('posts').once('value', snap => {
+            const dynamicData = snap.val() || {};
+            renderPostList(staticPosts, dynamicData);
         });
-        
-        const container = document.getElementById('postContainer');
-        container.innerHTML = html || '<p>No stories found.</p>';
-        
-        // 아이콘 다시 그리기 (Lucide)
-        if (window.lucide) lucide.createIcons();
-    });
+    } catch (e) {
+        console.error("데이터 로딩 실패:", e);
+        document.getElementById('postContainer').innerHTML = '<p>Error loading stories.</p>';
+    }
 }
 
-// --- [2. 상세 페이지 보기 (좋아요/댓글 기능 포함)] ---
+// 리스트 렌더링 함수
+function renderPostList(staticData, dynamicData) {
+    let html = '';
+    // 정적 데이터의 키를 기준으로 최신순 정렬하여 출력
+    Object.keys(staticData).reverse().forEach(key => {
+        const p = staticData[key];
+        const d = dynamicData[key] || {}; 
+        
+        const likes = d.likes || 0;
+        const commentsCount = d.comments ? Object.keys(d.comments).length : 0;
+        
+        // 검색용 텍스트에서 HTML 태그 제거
+        const pureDesc = p.desc.replace(/<[^>]*>?/gm, '');
+
+        html += `
+        <article class="post-card" onclick="viewPost('${key}')" style="cursor:pointer;">
+            <div class="post-image" style="background-image:url('${p.img}')"></div>
+            <div class="post-info">
+                <span class="post-cat-tag">${p.cat}</span>
+                <h3 class="post-list-title">${p.title}</h3>
+                <p class="post-list-desc">${pureDesc.substring(0, 130)}...</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; border-top:1px solid rgba(255,255,255,0.05); padding-top:15px;">
+                    <small style="color:var(--text-muted); font-size:0.75rem;">${p.date}</small>
+                    <div style="font-size:0.8rem; color:var(--primary-batik);">
+                        <span style="margin-right:10px;">❤ ${likes}</span>
+                        <span>💬 ${commentsCount}</span>
+                    </div>
+                </div>
+            </div>
+        </article>`;
+    });
+    
+    const container = document.getElementById('postContainer');
+    container.innerHTML = html || '<p>No stories found.</p>';
+    if (window.lucide) lucide.createIcons();
+}
+
+// --- [2. 상세 페이지 보기] ---
 
 function viewPost(key) {
-    db.ref(`posts/${key}`).once('value', snap => {
-        const p = snap.val();
-        if (!p) return;
+    const p = staticPosts[key]; // 정적 데이터에서 본문 가져오기
+    if (!p) return;
 
+    // Firebase에서 실시간 동적 데이터(댓글, 좋아요)만 가져오기
+    db.ref(`posts/${key}`).once('value', snap => {
+        const d = snap.val() || {};
+        const likes = d.likes || 0;
+        
         const hero = document.getElementById('mainHero');
         if (hero) {
             hero.style.height = '40vh'; 
@@ -95,25 +113,22 @@ function viewPost(key) {
             hero.querySelector('.hero-subtitle').innerText = `${p.cat} • ${p.date}`;
         }
 
-        const container = document.getElementById('postContainer');
-        
-        // 댓글 렌더링 로직
         let commentsHtml = '';
-        if (p.comments) {
-            Object.values(p.comments).forEach(c => {
+        if (d.comments) {
+            Object.values(d.comments).forEach(c => {
                 commentsHtml += `
-                    <div style="background:rgba(255,255,255,0.03); padding:15px; border-radius:10px; margin-bottom:10px; border-left:3px solid var(--primary-batik);">
-                        <p style="margin:0; font-size:0.95rem;">${c.text}</p>
-                        <small style="color:var(--text-muted); font-size:0.75rem;">${c.date}</small>
+                    <div class="comment-item">
+                        <p class="comment-text">${c.text}</p>
+                        <small class="comment-date">${c.date}</small>
                     </div>`;
             });
         } else {
             commentsHtml = `<p id="noComment" style="color:var(--text-muted);">No comments yet.</p>`;
         }
 
-        container.innerHTML = `
+        document.getElementById('postContainer').innerHTML = `
             <div class="post-detail-view" style="animation: fadeInUp 0.5s ease;">
-                <button class="btn-text" onclick="loadPosts()" style="text-align:left; margin-bottom:20px; display:flex; align-items:center; gap:5px; color:var(--primary-batik); background:none; border:none; cursor:pointer;">
+                <button class="btn-text" onclick="loadPosts()" style="margin-bottom:20px; display:flex; align-items:center; gap:5px; color:var(--primary-batik); background:none; border:none; cursor:pointer;">
                     <i data-lucide="arrow-left"></i> Back to List
                 </button>
                 
@@ -124,8 +139,8 @@ function viewPost(key) {
                 </div>
 
                 <div style="text-align:center; margin-bottom:40px;">
-                    <button onclick="handleLike('${key}')" style="background:rgba(212,175,55,0.1); border:1px solid var(--primary-batik); color:var(--primary-batik); padding:10px 25px; border-radius:30px; cursor:pointer; font-weight:bold; display:inline-flex; align-items:center; gap:8px;">
-                        <i data-lucide="heart"></i> <span id="detailLikeCount">${p.likes || 0}</span>
+                    <button onclick="handleLike('${key}')" class="btn-like">
+                        <i data-lucide="heart"></i> <span id="detailLikeCount">${likes}</span>
                     </button>
                 </div>
 
@@ -133,12 +148,11 @@ function viewPost(key) {
                 
                 <section class="comment-section">
                     <h3 style="font-family:'Playfair Display', serif; color:var(--primary-batik); margin-bottom:20px;">Comments</h3>
-                    
                     <div id="commentList" style="margin-bottom:30px;">
                         ${commentsHtml}
                     </div>
 
-                    <div style="background:rgba(255,255,255,0.02); padding:20px; border-radius:15px; border:1px solid var(--border);">
+                    <div class="comment-form" style="background:rgba(255,255,255,0.02); border:1px solid var(--border);">
                         <div style="margin-bottom:10px; display:flex; gap:10px; font-size:1.2rem;">
                             <span style="cursor:pointer" onclick="addEmoji('😊')">😊</span>
                             <span style="cursor:pointer" onclick="addEmoji('😍')">😍</span>
@@ -146,33 +160,24 @@ function viewPost(key) {
                             <span style="cursor:pointer" onclick="addEmoji('🔥')">🔥</span>
                             <span style="cursor:pointer" onclick="addEmoji('✨')">✨</span>
                         </div>
-                        <textarea id="commentInput" style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border); color:white; border-radius:8px; padding:12px; margin-bottom:10px; resize:none;" rows="3" placeholder="Share your thoughts..."></textarea>
-                        <button onclick="addComment('${key}')" class="btn-gold" style="width:100%;">POST COMMENT</button>
+                        <textarea id="commentInput" rows="3" placeholder="Share your thoughts..."></textarea>
+                        <button onclick="addComment('${key}')" class="btn-gold-full">POST COMMENT</button>
                     </div>
                 </section>
-
-                <div style="margin-top:50px; text-align:center; border-top:1px solid var(--border); padding-top:30px;">
-                    <button class="btn-text" onclick="loadPosts()" style="color:var(--text-muted); cursor:pointer; background:none; border:none; display:inline-flex; align-items:center; gap:8px;">
-                         <i data-lucide="layout-list"></i> Back to Post List
-                    </button>
-                </div>
             </div>
         `;
 
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 }
 
-// --- [신규 기능: 좋아요 & 댓글 로직] ---
+// --- [좋아요 & 댓글 로직] ---
 
-// 1. 이모티콘 입력
 function addEmoji(emoji) {
-    const input = document.getElementById('commentInput');
-    input.value += emoji;
+    document.getElementById('commentInput').value += emoji;
 }
 
-// 2. 좋아요 처리 (IP 중복체크)
 function handleLike(postKey) {
     const likeRef = db.ref(`posts/${postKey}/likedBy/${userIP}`);
     likeRef.once('value', snap => {
@@ -181,20 +186,17 @@ function handleLike(postKey) {
         } else {
             db.ref(`posts/${postKey}/likes`).transaction(current => (current || 0) + 1);
             likeRef.set(true);
-            // UI 업데이트
             const countSpan = document.getElementById('detailLikeCount');
-            countSpan.innerText = parseInt(countSpan.innerText) + 1;
+            if(countSpan) countSpan.innerText = parseInt(countSpan.innerText) + 1;
         }
     });
 }
 
-// 3. 댓글 추가 (IP 중복체크)
 function addComment(postKey) {
     const text = document.getElementById('commentInput').value.trim();
     if (!text) return alert('Please enter your comment.');
 
     const commentCheckRef = db.ref(`posts/${postKey}/commentedBy/${userIP}`);
-    
     commentCheckRef.once('value', snap => {
         if (snap.exists()) {
             alert('You have already commented on this post. 🙏');
@@ -204,17 +206,15 @@ function addComment(postKey) {
                 date: new Date().toLocaleString(),
                 user: userIP
             };
-            
             db.ref(`posts/${postKey}/comments`).push(commentData).then(() => {
                 commentCheckRef.set(true);
-                alert('Comment posted!');
-                viewPost(postKey); // 화면 갱신
+                viewPost(postKey); 
             });
         }
     });
 }
 
-// --- [3. 관리자 기능 및 UI] ---
+// --- [관리자 및 UI] ---
 
 function handleLogin() {
     const id = document.getElementById('adminId').value;
@@ -236,29 +236,11 @@ function logout() {
     window.location.reload();
 }
 
-function savePost() {
-    const title = document.getElementById('postTitle').value;
-    const cat = document.getElementById('postCat').value;
-    const img = document.getElementById('postImg').value;
-    const desc = document.getElementById('postDesc').value;
-
-    if(!title || !desc) return alert('Please fill in required fields.');
-
-    const newPostRef = db.ref('posts').push();
-    newPostRef.set({
-        title, cat, img: img || 'https://picsum.photos/800/500', desc,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        likes: 0
-    }).then(() => {
-        closeModal('postModal');
-        loadPosts();
-    });
-}
-
 function updateUI() {
     const auth = sessionStorage.getItem('admin') === 'true';
     const adminControls = document.getElementById('adminControls');
     const loginBtn = document.getElementById('loginBtn');
+    
     if (auth) {
         if(adminControls) adminControls.style.display = 'flex';
         if(loginBtn) loginBtn.style.display = 'none';
@@ -275,11 +257,10 @@ function updateUI() {
     }
 }
 
-// --- [4. 초기화] ---
+// --- [초기화] ---
 window.onload = async () => {
-    await getUserIP(); // IP 먼저 가져오기
-    setRandomHero();
-    loadPosts();
+    await getUserIP(); 
+    loadPosts(); // JSON + Firebase 통합 로드
     updateUI();
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 };
