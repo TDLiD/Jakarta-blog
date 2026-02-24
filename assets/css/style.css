@@ -313,3 +313,78 @@ body {
     max-height: 500px;
     border: 1px solid var(--border);
 }
+/* 관리자 네비게이션 버튼 공통 */
+.nav-admin-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 6px 14px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-admin-btn i {
+    color: var(--primary-batik);
+}
+
+.nav-admin-btn:hover {
+    background: var(--glass);
+    border-color: var(--primary-batik);
+    transform: translateY(-2px);
+}
+
+/* NEW 버튼 강조 */
+.nav-admin-btn.create {
+    border-color: rgba(212, 175, 55, 0.4);
+    background: rgba(212, 175, 55, 0.05);
+}
+
+/* 로그아웃 버튼 (좀 더 차분하게) */
+.nav-admin-btn.logout {
+    border: none;
+    color: var(--text-muted);
+}
+
+.nav-admin-btn.logout:hover {
+    color: #ff6b6b;
+    background: none;
+}
+
+/* 프로필 이미지 세련되게 */
+.profile-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.profile-img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--primary-batik);
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.profile-img:hover {
+    transform: scale(1.1);
+}
+
+.status-dot {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border: 2px solid var(--jungle-dark);
+    border-radius: 50%;
+}
