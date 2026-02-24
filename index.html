@@ -14,19 +14,33 @@
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container nav-flex">
-<a href="javascript:void(0)" onclick="loadPosts()" class="logo">JAKARTA JOURNAL</a>
-            <div class="nav-right">
-                <button id="loginBtn" onclick="openLogin()" class="icon-btn"><i data-lucide="user-lock"></i></button>
-                <div id="adminControls" style="display:none; align-items:center; gap:15px;">
-                    <button class="btn-create" onclick="openPostModal()"><i data-lucide="plus-circle"></i> NEW</button>
-                    <img id="profileBtn" class="profile-img" src="images/profile/6.gif" onclick="openProfileModal()">
-                    <button id="logoutBtn" onclick="logout()" class="logout-link">LOGOUT</button>
+<nav class="navbar">
+    <div class="container nav-flex">
+        <a href="javascript:void(0)" onclick="loadPosts()" class="logo">JAKARTA JOURNAL</a>
+        <div class="nav-right">
+            <button id="loginBtn" onclick="openLogin()" class="icon-btn" title="Admin Login">
+                <i data-lucide="user-lock"></i>
+            </button>
+
+            <div id="adminControls" style="display:none; align-items:center; gap:20px;">
+                <button class="nav-admin-btn create" onclick="openPostModal()">
+                    <i data-lucide="plus-circle" size="18"></i>
+                    <span>NEW STORY</span>
+                </button>
+                
+                <div class="profile-wrapper">
+                    <img id="profileBtn" class="profile-img" src="./images/profile/6.gif" onerror="this.src='https://picsum.photos/100'" onclick="openProfileModal()">
+                    <span class="status-dot"></span>
                 </div>
+
+                <button id="logoutBtn" onclick="logout()" class="nav-admin-btn logout">
+                    <i data-lucide="log-out" size="18"></i>
+                    <span>LOGOUT</span>
+                </button>
             </div>
         </div>
-    </nav>
+    </div>
+</nav>
 
     <header class="hero" id="mainHero">
         <div class="hero-overlay"></div>
