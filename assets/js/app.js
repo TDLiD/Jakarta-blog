@@ -20,6 +20,76 @@ async function getUserIP() {
     }
 }
 
+
+// 1. 방문자 카운트 증가 (페이지 로드 시)
+function updateVisitorStats() {
+    const visitRef = db.ref('stats/visits');
+    visitRef.transaction((currentValue) => {
+        return (currentValue || 0) + 1;
+    });
+}
+updateVisitorStats(); // index.html 로드 시 실행
+
+// 2. 로그인 상태에 따른 UI 업데이트 함수 수정
+function updateUI(isAdmin) {
+    const loginBtn = document.getElementById('loginBtn');
+    const adminControls = document.getElementById('adminControls');
+    
+    if (isAdmin) {
+        if(loginBtn) loginBtn.style.display = 'none';
+        if(adminControls) adminControls.style.display = 'flex';
+        // 프로필 데이터가 있다면 이미지 업데이트
+        db.ref('adminInfo').once('value', (snap) => {
+            const data = snap.val();
+            if(data && data.photo) {
+                document.getElementById('profileBtn').src = data.photo;
+            }
+        });
+    } else {
+        if(loginBtn) loginBtn.style.display = 'block';
+        if(adminControls) adminControls.style.display = 'none';
+    }
+}
+
+async function trackVisitor() {
+    // 관리자(나)의 접속은 기록하지 않음
+    if(sessionStorage.getItem('admin') === 'true') return;
+
+    try {
+        // IP 정보를 가져오는 무료 서비스
+        const res = await fetch('https://ipapi.co/json/');
+        const ipData = await res.json();
+
+        const logEntry = {
+            ip: ipData.ip,
+            location: `${ipData.city}, ${ipData.country_name}`,
+            agent: navigator.userAgent,
+            time: new Date().toLocaleString('ko-KR'),
+            timestamp: Date.now()
+        };
+
+        // 1. 상세 로그 기록 (이게 있어야 Admin에서 보임)
+        firebase.database().ref('visitorLog').push(logEntry);
+        
+        // 2. 방문자 숫자 증가
+        firebase.database().ref('stats/visits').transaction(c => (c || 0) + 1);
+
+    } catch (e) {
+        // IP 차단되더라도 기본 정보는 남김
+        firebase.database().ref('visitorLog').push({
+            ip: "Private",
+            location: "Unknown",
+            agent: navigator.userAgent,
+            time: new Date().toLocaleString('ko-KR'),
+            timestamp: Date.now()
+        });
+        firebase.database().ref('stats/visits').transaction(c => (c || 0) + 1);
+    }
+}
+
+// 페이지 로드 시 즉시 실행
+trackVisitor();
+
 // --- [1. 메인 레이아웃 제어] ---
 
 function setRandomHero() {
@@ -231,9 +301,89 @@ function handleLogin() {
     });
 }
 
+// 1. 로그인 핸들러 수정 (엔터 키 지원 및 저장 후 이동 보장)
+async function handleLogin() {
+    const id = document.getElementById('adminId').value;
+    const pw = document.getElementById('adminPw').value;
+
+    try {
+        const snap = await db.ref('adminInfo').once('value');
+        const admin = snap.val();
+
+        if (admin && id === admin.id && pw === admin.password) {
+            sessionStorage.setItem('admin', 'true');
+            closeModal('loginModal');
+            updateUI();
+            // 메인 페이지 포스트 재로딩 (선택사항)
+            if(typeof loadPosts === 'function') loadPosts();
+        } else {
+            alert('Invalid Credentials.');
+        }
+    } catch (e) {
+        alert('Login Error: ' + e.message);
+    }
+}
+
+// 2. 비밀번호 분실 시 힌트 제공 함수
+async function forgotPassword() {
+    const inputId = prompt("Enter your Admin ID to get a security hint:");
+    if (!inputId) return;
+
+    try {
+        const snap = await db.ref('adminInfo').once('value');
+        const adminData = snap.val();
+
+        if (adminData && inputId === adminData.id) {
+            const hint = adminData.password.substring(0, 2);
+            alert(`Verified. Your password starts with: [ ${hint} ]`);
+        } else {
+            alert("Incorrect Admin ID.");
+        }
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
+}
+
+
+// 비밀번호 힌트 기능 (로그인 전용)
+async function forgotPassword() {
+    const inputId = prompt("Please enter your Admin ID to get a security hint:");
+    if (!inputId) return;
+
+    try {
+        const snap = await db.ref('adminInfo').once('value');
+        const adminData = snap.val();
+
+        if (adminData && inputId === adminData.id) {
+            // 비밀번호 앞 2자리 힌트 제공
+            const hint = adminData.password.substring(0, 2);
+            alert(`Verified. Your Security Key starts with: [ ${hint} ]`);
+        } else {
+            alert("Incorrect Admin ID. Access Denied.");
+        }
+    } catch (err) {
+        alert("Error fetching data: " + err.message);
+    }
+}
+
 function logout() {
-    sessionStorage.removeItem('admin');
-    window.location.reload();
+    if (confirm("Are you sure you want to sign out?")) {
+        // 1. Firebase Authentication Sign-out (if applicable)
+        if (firebase.auth) {
+            firebase.auth().signOut().then(() => {
+                console.log("Firebase Auth signed out.");
+            }).catch((error) => {
+                console.error("Sign out error:", error);
+            });
+        }
+
+        // 2. Clear browser storage data (Admin session, etc.)
+        sessionStorage.clear(); // Clear all session storage
+        localStorage.removeItem('admin'); // Remove specific admin flag from local storage
+        
+        // 3. Update UI and redirect to the main page
+        window.location.href = 'index.html'; 
+    }
 }
 
 function updateUI() {
