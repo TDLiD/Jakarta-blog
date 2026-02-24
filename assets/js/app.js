@@ -31,17 +31,25 @@ function setRandomHero() {
 }
 
 function loadPosts() {
+    // 1. 페이지 최상단으로 부드럽게 이동
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // 2. 히로 섹션(배너) 복구
     const hero = document.getElementById('mainHero');
     if (hero) {
-        hero.style.height = '85vh';
+        hero.style.height = '85vh'; // 메인 배너 높이로 복구
         hero.querySelector('.hero-title').innerText = "Wonderful Jakarta";
         hero.querySelector('.hero-subtitle').innerText = "Exploring the vibrant fusion of heritage and high-rise.";
+        // 필요하다면 배경 이미지도 새로 고침
         setRandomHero(); 
     }
 
+    // 3. 데이터 로딩 및 리스트 출력
     db.ref('posts').once('value', snap => {
         const allPosts = snap.val() || {};
         let html = '';
+        
+        // 최신글 순으로 정렬
         Object.keys(allPosts).reverse().forEach(key => {
             const p = allPosts[key];
             const likes = p.likes || 0;
@@ -64,7 +72,12 @@ function loadPosts() {
                 </div>
             </article>`;
         });
-        document.getElementById('postContainer').innerHTML = html || '<p>No stories found.</p>';
+        
+        const container = document.getElementById('postContainer');
+        container.innerHTML = html || '<p>No stories found.</p>';
+        
+        // 아이콘 다시 그리기 (Lucide)
+        if (window.lucide) lucide.createIcons();
     });
 }
 
