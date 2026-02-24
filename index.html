@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jakarta Journal | Admin Portal</title>
+    <title>Jakarta Journal | Discover Indonesia</title>
     
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -17,66 +17,72 @@
     <nav class="navbar">
         <div class="container nav-flex">
             <a href="/" class="logo">JAKARTA JOURNAL</a>
-            <div style="display:flex; gap:15px; align-items:center;">
-                <button id="loginBtn" onclick="openLogin()" style="background:none; border:none; color:var(--primary-batik); cursor:pointer;"><i data-lucide="user-lock"></i></button>
-                <img id="profileBtn" class="profile-img" src="images/profile/6.gif" onclick="openProfileModal()" title="Change Profile Image">
-                <button id="logoutBtn" onclick="logout()" style="display:none; background:none; border:none; color:var(--primary-batik); font-weight:bold; font-size:12px; cursor:pointer;">LOGOUT</button>
+            <div class="nav-right">
+                <button id="loginBtn" onclick="openLogin()" class="icon-btn"><i data-lucide="user-lock"></i></button>
+                <div id="adminControls" style="display:none; align-items:center; gap:15px;">
+                    <button class="btn-create" onclick="openPostModal()"><i data-lucide="plus-circle"></i> NEW</button>
+                    <img id="profileBtn" class="profile-img" src="images/profile/6.gif" onclick="openProfileModal()">
+                    <button id="logoutBtn" onclick="logout()" class="logout-link">LOGOUT</button>
+                </div>
             </div>
         </div>
     </nav>
 
-    <header class="hero">
+    <header class="hero" id="mainHero">
+        <div class="hero-overlay"></div>
         <div class="hero-content">
-            <span class="hero-badge">The Heart of Indonesia</span>
-            <h1>Wonderful Jakarta</h1>
-            <p style="opacity:0.9;">Exploring the vibrant fusion of tradition and modernity.</p>
+            <span class="hero-badge">THE SOUL OF JAVA</span>
+            <h1 class="hero-title">Wonderful Jakarta</h1>
+            <p class="hero-subtitle">Exploring the vibrant fusion of heritage and high-rise.</p>
+            <div class="hero-scroll">
+                <div class="mouse"></div>
+            </div>
         </div>
     </header>
 
     <main class="container">
         <div class="main-layout">
-            <div class="content-area" id="postContainer"></div>
-            <aside class="sidebar">
-                <div class="admin-only" id="adminPanel">
-                    <button class="btn-gold" style="width:100%; margin-bottom:20px;" onclick="openPostModal()">+ NEW POST</button>
-                </div>
-                <section class="sidebar-card">
-                    <h3 style="font-family:'Playfair Display',serif; color:var(--primary-batik);">About Journal</h3>
-                    <p id="aboutText" style="font-size:0.9rem; opacity:0.8;">Curating the best travel experiences across Jakarta.</p>
+            <section class="content-area" id="postContainer">
                 </section>
-            </aside>
+            
+            <aside class="sidebar">
+                <div class="sidebar-card about-card">
+                    <h3>The Journal</h3>
+                    <p id="aboutText">Curating the best travel experiences across Jakarta.</p>
+                </div>
+                </aside>
         </div>
     </main>
 
     <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <h2 style="color:var(--primary-batik); margin-top:0;">Admin Login</h2>
-            <input type="text" id="adminId" placeholder="ID">
-            <input type="password" id="adminPw" placeholder="Password">
-            <button class="btn-gold" style="width:100%; margin-top:10px;" onclick="handleLogin()">LOGIN</button>
-            <button onclick="closeModal('loginModal')" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:10px; cursor:pointer;">Cancel</button>
+        <div class="modal-content glass">
+            <h2>Admin Gateway</h2>
+            <div class="input-group">
+                <input type="text" id="adminId" placeholder="Access ID">
+                <input type="password" id="adminPw" placeholder="Security Key">
+            </div>
+            <button class="btn-gold-full" onclick="handleLogin()">AUTHENTICATE</button>
+            <button class="btn-text" onclick="closeModal('loginModal')">Cancel</button>
         </div>
     </div>
 
     <div id="postModal" class="modal">
-        <div class="modal-content">
-            <h2 style="color:var(--primary-batik); margin-top:0;">Create Post</h2>
-            <input type="text" id="postTitle" placeholder="Post Title">
-            <input type="text" id="postCat" placeholder="Category">
-            <input type="text" id="postImg" placeholder="Image URL (e.g., images/posts/2026/...)">
-            <textarea id="postDesc" rows="4" placeholder="Description"></textarea>
-            <button class="btn-gold" style="width:100%;" onclick="savePost()">SAVE POST</button>
-            <button onclick="closeModal('postModal')" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:10px; cursor:pointer;">Cancel</button>
+        <div class="modal-content glass">
+            <h2>New Story</h2>
+            <input type="text" id="postTitle" placeholder="Enter Title">
+            <input type="text" id="postCat" placeholder="Category (e.g. Travel, Food)">
+            <input type="text" id="postImg" placeholder="Image URL Path">
+            <textarea id="postDesc" rows="6" placeholder="Share your experience..."></textarea>
+            <button class="btn-gold-full" onclick="savePost()">PUBLISH STORY</button>
+            <button class="btn-text" onclick="closeModal('postModal')">Cancel</button>
         </div>
     </div>
 
     <div id="profileModal" class="modal">
-        <div class="modal-content" style="max-width: 400px; text-align: center;">
-            <h2 style="color:var(--primary-batik); margin-top:0;">Select Profile Image</h2>
-            <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:15px;">Choose an avatar from images/profile/</p>
-            <div id="profileGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0;">
-                </div>
-            <button onclick="closeModal('profileModal')" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:10px; cursor:pointer;">Cancel</button>
+        <div class="modal-content glass center">
+            <h2>Identity Image</h2>
+            <div id="profileGrid" class="profile-grid"></div>
+            <button class="btn-text" onclick="closeModal('profileModal')">Close</button>
         </div>
     </div>
 
