@@ -167,11 +167,12 @@ function renderPostList(staticData, dynamicData) {
 
 // --- [2. 상세 페이지 보기] ---
 
+// --- [2. 상세 페이지 보기 수정본] ---
+
 function viewPost(key) {
-    const p = staticPosts[key]; // 정적 데이터에서 본문 가져오기
+    const p = staticPosts[key]; 
     if (!p) return;
 
-    // Firebase에서 실시간 동적 데이터(댓글, 좋아요)만 가져오기
     db.ref(`posts/${key}`).once('value', snap => {
         const d = snap.val() || {};
         const likes = d.likes || 0;
@@ -183,6 +184,7 @@ function viewPost(key) {
             hero.querySelector('.hero-subtitle').innerText = `${p.cat} • ${p.date}`;
         }
 
+        // 댓글 HTML 생성
         let commentsHtml = '';
         if (d.comments) {
             Object.values(d.comments).forEach(c => {
@@ -196,9 +198,26 @@ function viewPost(key) {
             commentsHtml = `<p id="noComment" style="color:var(--text-muted);">No comments yet.</p>`;
         }
 
+        // --- 추가된 기능: 다른 포스트 리스트 생성 ---
+        let otherPostsHtml = '<div class="other-posts-list" style="margin-top:40px; border-top:1px solid var(--border); padding-top:20px;">';
+        otherPostsHtml += '<h4 style="color:var(--primary-batik); margin-bottom:15px; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">More Stories</h4>';
+        
+        Object.keys(staticPosts).reverse().forEach(otherKey => {
+            if (otherKey !== key) { // 현재 보고 있는 글은 제외
+                const op = staticPosts[otherKey];
+                otherPostsHtml += `
+                    <div class="other-post-item" onclick="viewPost('${otherKey}')" style="cursor:pointer; display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.95rem; transition:0.2s;">
+                        <span class="other-post-title" style="color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">• ${op.title}</span>
+                        <span style="color:var(--text-muted); font-size:0.8rem; flex-shrink:0; margin-left:10px;">${op.date}</span>
+                    </div>`;
+            }
+        });
+        otherPostsHtml += '</div>';
+
+        // 메인 컨테이너 업데이트
         document.getElementById('postContainer').innerHTML = `
             <div class="post-detail-view" style="animation: fadeInUp 0.5s ease;">
-                <button class="btn-text" onclick="loadPosts()" style="margin-bottom:20px; display:flex; align-items:center; gap:5px; color:var(--primary-batik); background:none; border:none; cursor:pointer;">
+                <button class="btn-text" onclick="loadPosts()" style="margin-bottom:20px; display:flex; align-items:center; gap:5px; color:var(--primary-batik); background:none; border:none; cursor:pointer; font-weight:bold;">
                     <i data-lucide="arrow-left"></i> Back to List
                 </button>
                 
@@ -222,7 +241,7 @@ function viewPost(key) {
                         ${commentsHtml}
                     </div>
 
-                    <div class="comment-form" style="background:rgba(255,255,255,0.02); border:1px solid var(--border);">
+                    <div class="comment-form" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:20px; border-radius:10px;">
                         <div style="margin-bottom:10px; display:flex; gap:10px; font-size:1.2rem;">
                             <span style="cursor:pointer" onclick="addEmoji('😊')">😊</span>
                             <span style="cursor:pointer" onclick="addEmoji('😍')">😍</span>
@@ -230,10 +249,18 @@ function viewPost(key) {
                             <span style="cursor:pointer" onclick="addEmoji('🔥')">🔥</span>
                             <span style="cursor:pointer" onclick="addEmoji('✨')">✨</span>
                         </div>
-                        <textarea id="commentInput" rows="3" placeholder="Share your thoughts..."></textarea>
-                        <button onclick="addComment('${key}')" class="btn-gold-full">POST COMMENT</button>
+                        <textarea id="commentInput" rows="3" placeholder="Share your thoughts..." style="width:100%; background:transparent; border:none; color:white; outline:none; margin-bottom:10px;"></textarea>
+                        <button onclick="addComment('${key}')" class="btn-gold-full" style="width:100%; padding:12px; background:var(--primary-batik); border:none; color:black; font-weight:bold; border-radius:5px; cursor:pointer;">POST COMMENT</button>
+                        
+                        ${otherPostsHtml}
                     </div>
                 </section>
+
+                <div style="margin-top:50px; text-align:center;">
+                     <button class="btn-text" onclick="loadPosts()" style="display:inline-flex; align-items:center; gap:5px; color:var(--text-muted); background:none; border:1px solid #333; padding:10px 20px; border-radius:30px; cursor:pointer; transition:0.3s;">
+                        <i data-lucide="list"></i> Back to List
+                    </button>
+                </div>
             </div>
         `;
 
