@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jakarta Journal | Discover Indonesia</title>
     
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -14,33 +14,44 @@
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-<nav class="navbar">
-    <div class="container nav-flex">
-        <a href="javascript:void(0)" onclick="loadPosts()" class="logo">JAKARTA JOURNAL</a>
-        <div class="nav-right">
-            <button id="loginBtn" onclick="openLogin()" class="icon-btn" title="Admin Login">
-                <i data-lucide="user-lock"></i>
-            </button>
-
-            <div id="adminControls" style="display:none; align-items:center; gap:20px;">
-                <button class="nav-admin-btn create" onclick="openPostModal()">
-                    <i data-lucide="plus-circle" size="18"></i>
-                    <span>NEW STORY</span>
+    <nav class="navbar">
+        <div class="container nav-flex">
+            <a href="javascript:void(0)" onclick="loadPosts()" class="logo">JAKARTA JOURNAL</a>
+            
+            <div class="nav-right">
+                <button id="loginBtn" onclick="openLogin()" class="icon-btn" title="Admin Login">
+                    <i data-lucide="user-lock"></i>
                 </button>
-                
-                <div class="profile-wrapper">
-                    <img id="profileBtn" class="profile-img" src="./images/profile/6.gif" onerror="this.src='https://picsum.photos/100'" onclick="openProfileModal()">
-                    <span class="status-dot"></span>
+
+                <div id="adminControls" style="display:none; align-items:center; gap:15px;">
+                    <button class="nav-admin-btn create" onclick="openPostModal()">
+                        <i data-lucide="plus-circle" size="18"></i>
+                        <span>NEW STORY</span>
+                    </button>
+                    
+                    <div class="profile-area" style="display: flex; align-items: center; gap: 10px; padding: 0 5px; border-left: 1px solid #333; border-right: 1px solid #333;">
+                        <button id="adminDashBtn" class="icon-btn dashboard-link" onclick="location.href='admin.html'" title="Admin Dashboard">
+                            <i data-lucide="layout-dashboard"></i>
+                        </button>
+                        
+                        <div class="profile-wrapper" style="position: relative; line-height: 0;">
+                            <img id="profileBtn" class="profile-img" 
+                                 src="./images/profile/6.gif" 
+                                 onerror="this.src='https://picsum.photos/100'" 
+                                 onclick="location.href='profile.html'" 
+                                 style="cursor: pointer; width: 35px; height: 35px; border-radius: 50%; border: 2px solid var(--primary-batik);">
+                            <span class="status-dot"></span>
+                        </div>
+                    </div>
+
+                    <button id="logoutBtn" onclick="logout()" class="nav-admin-btn logout">
+                        <i data-lucide="log-out" size="18"></i>
+                        <span>LOGOUT</span>
+                    </button>
                 </div>
-
-                <button id="logoutBtn" onclick="logout()" class="nav-admin-btn logout">
-                    <i data-lucide="log-out" size="18"></i>
-                    <span>LOGOUT</span>
-                </button>
             </div>
         </div>
-    </div>
-</nav>
+    </nav>
 
     <header class="hero" id="mainHero">
         <div class="hero-overlay"></div>
@@ -64,7 +75,7 @@
                     <h3>The Journal</h3>
                     <p id="aboutText">Curating the best travel experiences across Jakarta.</p>
                 </div>
-                </aside>
+            </aside>
         </div>
     </main>
 
@@ -72,9 +83,16 @@
         <div class="modal-content glass">
             <h2>Admin Gateway</h2>
             <div class="input-group">
-                <input type="text" id="adminId" placeholder="Access ID">
-                <input type="password" id="adminPw" placeholder="Security Key">
+                <input type="text" id="adminId" placeholder="Access ID" onkeydown="if(event.key==='Enter') handleLogin()">
+                <input type="password" id="adminPw" placeholder="Security Key" onkeydown="if(event.key==='Enter') handleLogin()">
             </div>
+            
+            <div style="text-align: right; margin-bottom: 10px;">
+                <button type="button" onclick="forgotPassword()" style="background:none; border:none; color:var(--primary-batik); font-size:0.75rem; cursor:pointer; text-decoration: underline;">
+                    Forgot Password?
+                </button>
+            </div>
+
             <button class="btn-gold-full" onclick="handleLogin()">AUTHENTICATE</button>
             <button class="btn-text" onclick="closeModal('loginModal')">Cancel</button>
         </div>
@@ -101,5 +119,28 @@
     </div>
 
     <script src="assets/js/app.js"></script>
+    <script>
+        // Lucide 아이콘 초기화
+        lucide.createIcons();
+
+// 페이지 로드 시 관리자 권한 체크 및 UI 동기화
+function checkAuth() {
+    const isAdmin = sessionStorage.getItem('admin') === 'true';
+    const adminControls = document.getElementById('adminControls');
+    const loginBtn = document.getElementById('loginBtn');
+
+    if (isAdmin) {
+        if (adminControls) adminControls.style.display = 'flex';
+        if (loginBtn) loginBtn.style.display = 'none';
+    } else {
+        if (adminControls) adminControls.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'block';
+    }
+}
+
+// 초기 실행
+document.addEventListener('DOMContentLoaded', checkAuth);
+
+    </script>
 </body>
 </html>
