@@ -12,6 +12,47 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        /* AI 팝업 전용 추가 스타일 */
+        #aiWelcomeModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .ai-glass-card {
+            background: #121212;
+            border: 1px solid #d4af37;
+            width: 100%;
+            max-width: 500px;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* 줄바꿈 인식을 위한 스타일 추가 */
+        #aiWelcomeContent {
+            color: #efefef;
+            line-height: 1.8;
+            font-size: 16px;
+            word-break: keep-all;
+            white-space: pre-wrap; /* 이 설정이 줄바꿈(\n)을 화면에 표시해줍니다 */
+        }
+        .typing-cursor::after {
+            content: '|';
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -67,8 +108,7 @@
 
     <main class="container">
         <div class="main-layout">
-            <section class="content-area" id="postContainer">
-                </section>
+            <section class="content-area" id="postContainer"></section>
             
             <aside class="sidebar">
                 <div class="sidebar-card about-card">
@@ -79,68 +119,152 @@
         </div>
     </main>
 
-    <div id="loginModal" class="modal">
-        <div class="modal-content glass">
-            <h2>Admin Gateway</h2>
-            <div class="input-group">
-                <input type="text" id="adminId" placeholder="Access ID" onkeydown="if(event.key==='Enter') handleLogin()">
-                <input type="password" id="adminPw" placeholder="Security Key" onkeydown="if(event.key==='Enter') handleLogin()">
-            </div>
-            
-            <div style="text-align: right; margin-bottom: 10px;">
-                <button type="button" onclick="forgotPassword()" style="background:none; border:none; color:var(--primary-batik); font-size:0.75rem; cursor:pointer; text-decoration: underline;">
-                    Forgot Password?
+    <div id="aiWelcomeModal">
+        <div class="ai-glass-card">
+            <div style="padding:40px;">
+                <div style="display:flex; align-items:center; gap:20px; margin-bottom:25px;">
+                    <div style="width:60px; height:60px; background:linear-gradient(135deg, #d4af37, #b8860b); border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:30px; box-shadow:0 10px 20px rgba(212,175,55,0.2);">🤖</div>
+                    <div>
+                        <h4 style="color:#d4af37; margin:0; font-size:11px; letter-spacing:3px; font-weight:900; text-transform:uppercase;">AI Concierge</h4>
+                        <p style="color:white; margin:0; font-size:20px; font-weight:700;">Welcome, Explorer!</p>
+                    </div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(212,175,55,0.1); border-radius:20px; padding:25px; min-height:120px; margin-bottom:30px;">
+                    <div id="aiWelcomeContent">
+                        Analyzing...
+                    </div>
+                </div>
+                <button onclick="closeAiWelcome()" style="width:100%; background:#d4af37; color:black; border:none; padding:18px; border-radius:15px; font-weight:900; cursor:pointer; transition:all 0.3s; letter-spacing:1px;" onmouseover="this.style.transform='scale(1.02)'; this.style.background='#f1c40f';" onmouseout="this.style.transform='scale(1)'; this.style.background='#d4af37';">
+                    START READING
                 </button>
             </div>
-
-            <button class="btn-gold-full" onclick="handleLogin()">AUTHENTICATE</button>
-            <button class="btn-text" onclick="closeModal('loginModal')">Cancel</button>
-        </div>
-    </div>
-
-    <div id="postModal" class="modal">
-        <div class="modal-content glass">
-            <h2>New Story</h2>
-            <input type="text" id="postTitle" placeholder="Enter Title">
-            <input type="text" id="postCat" placeholder="Category (e.g. Travel, Food)">
-            <input type="text" id="postImg" placeholder="Image URL Path">
-            <textarea id="postDesc" rows="6" placeholder="Share your experience..."></textarea>
-            <button class="btn-gold-full" onclick="savePost()">PUBLISH STORY</button>
-            <button class="btn-text" onclick="closeModal('postModal')">Cancel</button>
-        </div>
-    </div>
-
-    <div id="profileModal" class="modal">
-        <div class="modal-content glass center">
-            <h2>Identity Image</h2>
-            <div id="profileGrid" class="profile-grid"></div>
-            <button class="btn-text" onclick="closeModal('profileModal')">Close</button>
         </div>
     </div>
 
     <script src="assets/js/app.js"></script>
     <script>
-        // Lucide 아이콘 초기화
         lucide.createIcons();
 
-// 페이지 로드 시 관리자 권한 체크 및 UI 동기화
-function checkAuth() {
-    const isAdmin = sessionStorage.getItem('admin') === 'true';
-    const adminControls = document.getElementById('adminControls');
-    const loginBtn = document.getElementById('loginBtn');
+        function checkAuth() {
+            const isAdmin = sessionStorage.getItem('admin') === 'true';
+            const adminControls = document.getElementById('adminControls');
+            const loginBtn = document.getElementById('loginBtn');
+            if (isAdmin) {
+                if (adminControls) adminControls.style.display = 'flex';
+                if (loginBtn) loginBtn.style.display = 'none';
+            } else {
+                if (adminControls) adminControls.style.display = 'none';
+                if (loginBtn) loginBtn.style.display = 'block';
+            }
+        }
 
-    if (isAdmin) {
-        if (adminControls) adminControls.style.display = 'flex';
-        if (loginBtn) loginBtn.style.display = 'none';
-    } else {
-        if (adminControls) adminControls.style.display = 'none';
-        if (loginBtn) loginBtn.style.display = 'block';
+// --- AI Welcome Logic (Firebase Integration Version) ---
+async function startWelcomeAI() {
+    const modal = document.getElementById('aiWelcomeModal');
+    const content = document.getElementById('aiWelcomeContent');
+    
+    // 모달 먼저 표시
+    modal.style.display = 'flex';
+
+    try {
+        // 1. Firebase에서 API KEY 가져오기
+        // .once('value')를 사용하여 adminInfo 경로의 데이터를 한 번 읽어옵니다.
+        const snapshot = await firebase.database().ref('adminInfo').once('value');
+        const adminData = snapshot.val();
+        
+        if (!adminData || !adminData.LLMAPIkey) {
+            throw new Error("API Key not found in Firebase");
+        }
+        
+        const GROQ_KEY = adminData.LLMAPIkey;
+
+        // 2. 시간 데이터 준비
+        const now = new Date();
+        const jktTime = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Jakarta',
+            hour: '2-digit', minute: '2-digit', hour12: true, weekday: 'long'
+        }).format(now);
+        
+        const seoTime = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Seoul',
+            hour: '2-digit', minute: '2-digit', hour12: true
+        }).format(now);
+
+        // 3. Groq AI API 호출
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${GROQ_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [{
+                    role: "system",
+                    content: `You are the professional AI Guide for 'Jakarta Journal'. 
+                    Respond ONLY in English. Use professional yet friendly tone with appropriate emojis. 
+                    Use clear line breaks between different sections of your briefing.`
+                }, {
+                    role: "user",
+                    content: `Create a brief welcome briefing for a blog visitor with the following data:
+                    
+                    - Current Context: Jakarta is ${jktTime}, Seoul is ${seoTime}.
+                    - Weather Context: Mention that Jakarta is tropical/warm while Seoul is currently in its seasonal phase.
+                    - Economy News: Briefly mention one line about Indonesia and South Korea's economic situation.
+                    - Lucky Items: Provide a random 2-digit lucky number and a lucky color for today.
+                    - Humor: Include a short, witty joke about office life or coffee in Indonesia.
+                    
+                    Structure (Please separate each point with a double line break): 
+                    1. Warm Greeting with Time/Weather info.
+                    2. Economic Insight.
+                    3. Daily Luck (Number & Color).
+                    4. A quick Joke.
+                    
+                    Keep the total length under 150 words.`
+                }],
+                temperature: 0.7,
+                max_tokens: 500
+            })
+        });
+
+        const data = await response.json();
+        const text = data.choices[0].message.content || "Welcome to Jakarta Journal!";
+        
+        // 타이핑 효과 실행
+        typeWriter(text, content);
+
+    } catch (e) {
+        console.error("AI Briefing Error:", e);
+        content.innerHTML = "Welcome to Jakarta Journal!\n\nExplore our stories of heritage and high-rises. 🌴";
     }
 }
 
-// 초기 실행
-document.addEventListener('DOMContentLoaded', checkAuth);
+        function typeWriter(text, element) {
+            let i = 0;
+            element.innerText = ""; // innerHTML 대신 innerText 사용 (보안 및 줄바꿈 관리)
+            element.classList.add('typing-cursor');
+            
+            function step() {
+                if (i < text.length) {
+                    // element.innerText를 사용하면 \n을 자동으로 <br>처럼 인식하여 줄바꿈합니다 (white-space 설정 덕분)
+                    element.innerText += text.charAt(i);
+                    i++;
+                    setTimeout(step, 20);
+                } else {
+                    element.classList.remove('typing-cursor');
+                }
+            }
+            step();
+        }
 
+        function closeAiWelcome() {
+            document.getElementById('aiWelcomeModal').style.display = 'none';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            setTimeout(startWelcomeAI, 1200);
+        });
     </script>
 </body>
 </html>
