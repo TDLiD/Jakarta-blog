@@ -1,11 +1,9 @@
 const firebaseConfig = { databaseURL: "https://jakarta-blog-default-rtdb.firebaseio.com" };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
 let userIP = ""; 
-let staticPosts = {}; // posts.json 데이터를 담을 변수
+let staticPosts = {};
 
-// --- [공통 및 유틸리티] ---
 const openLogin = () => document.getElementById('loginModal').style.display = 'flex';
 const openPostModal = () => document.getElementById('postModal').style.display = 'flex';
 const closeModal = id => document.getElementById(id).style.display = 'none';
@@ -20,46 +18,19 @@ async function getUserIP() {
     }
 }
 
-
-// 1. 방문자 카운트 증가 (페이지 로드 시)
 function updateVisitorStats() {
     const visitRef = db.ref('stats/visits');
     visitRef.transaction((currentValue) => {
         return (currentValue || 0) + 1;
     });
 }
-updateVisitorStats(); // index.html 로드 시 실행
-
-// 2. 로그인 상태에 따른 UI 업데이트 함수 수정
-function updateUI(isAdmin) {
-    const loginBtn = document.getElementById('loginBtn');
-    const adminControls = document.getElementById('adminControls');
-    
-    if (isAdmin) {
-        if(loginBtn) loginBtn.style.display = 'none';
-        if(adminControls) adminControls.style.display = 'flex';
-        // 프로필 데이터가 있다면 이미지 업데이트
-        db.ref('adminInfo').once('value', (snap) => {
-            const data = snap.val();
-            if(data && data.photo) {
-                document.getElementById('profileBtn').src = data.photo;
-            }
-        });
-    } else {
-        if(loginBtn) loginBtn.style.display = 'block';
-        if(adminControls) adminControls.style.display = 'none';
-    }
-}
+updateVisitorStats();
 
 async function trackVisitor() {
-    // 관리자(나)의 접속은 기록하지 않음
     if(sessionStorage.getItem('admin') === 'true') return;
-
     try {
-        // IP 정보를 가져오는 무료 서비스
         const res = await fetch('https://ipapi.co/json/');
         const ipData = await res.json();
-
         const logEntry = {
             ip: ipData.ip,
             location: `${ipData.city}, ${ipData.country_name}`,
@@ -67,15 +38,9 @@ async function trackVisitor() {
             time: new Date().toLocaleString('ko-KR'),
             timestamp: Date.now()
         };
-
-        // 1. 상세 로그 기록 (이게 있어야 Admin에서 보임)
         firebase.database().ref('visitorLog').push(logEntry);
-        
-        // 2. 방문자 숫자 증가
         firebase.database().ref('stats/visits').transaction(c => (c || 0) + 1);
-
     } catch (e) {
-        // IP 차단되더라도 기본 정보는 남김
         firebase.database().ref('visitorLog').push({
             ip: "Private",
             location: "Unknown",
@@ -86,11 +51,7 @@ async function trackVisitor() {
         firebase.database().ref('stats/visits').transaction(c => (c || 0) + 1);
     }
 }
-
-// 페이지 로드 시 즉시 실행
 trackVisitor();
-
-// --- [1. 메인 레이아웃 제어] ---
 
 function setRandomHero() {
     const hero = document.getElementById('mainHero');
@@ -100,10 +61,8 @@ function setRandomHero() {
     hero.style.backgroundImage = `url('${imageUrl}')`;
 }
 
-// 통합 로드 함수: JSON 파일 읽기 + Firebase 동적 데이터 매칭
 async function loadPosts() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
+ 
     const hero = document.getElementById('mainHero');
     if (hero) {
         hero.style.height = '85vh';
@@ -111,13 +70,9 @@ async function loadPosts() {
         hero.querySelector('.hero-subtitle').innerText = "Exploring the vibrant fusion of heritage and high-rise.";
         setRandomHero(); 
     }
-
     try {
-        // 1. 정적 JSON 파일 가져오기
         const response = await fetch('assets/data/posts.json');
         staticPosts = await response.json();
-
-        // 2. Firebase에서 동적 데이터(좋아요, 댓글) 가져오기
         db.ref('posts').once('value', snap => {
             const dynamicData = snap.val() || {};
             renderPostList(staticPosts, dynamicData);
@@ -128,20 +83,14 @@ async function loadPosts() {
     }
 }
 
-// 리스트 렌더링 함수
 function renderPostList(staticData, dynamicData) {
     let html = '';
-    // 정적 데이터의 키를 기준으로 최신순 정렬하여 출력
     Object.keys(staticData).reverse().forEach(key => {
         const p = staticData[key];
         const d = dynamicData[key] || {}; 
-        
         const likes = d.likes || 0;
         const commentsCount = d.comments ? Object.keys(d.comments).length : 0;
-        
-        // 검색용 텍스트에서 HTML 태그 제거
         const pureDesc = p.desc.replace(/<[^>]*>?/gm, '');
-
         html += `
         <article class="post-card" onclick="viewPost('${key}')" style="cursor:pointer;">
             <div class="post-image" style="background-image:url('${p.img}')"></div>
@@ -159,118 +108,128 @@ function renderPostList(staticData, dynamicData) {
             </div>
         </article>`;
     });
-    
     const container = document.getElementById('postContainer');
     container.innerHTML = html || '<p>No stories found.</p>';
     if (window.lucide) lucide.createIcons();
 }
 
-// --- [2. 상세 페이지 보기] ---
+let editingCommentId = null; 
 
-// --- [2. 상세 페이지 보기 수정본] ---
+function editCommentMode(text, commentId) {
+    const input = document.getElementById('commentInput');
+    const btn = document.getElementById('commentSubmitBtn');
+    input.value = text;
+    editingCommentId = commentId; // 현재 수정 중인 댓글 ID 저장
+    input.focus();
+    btn.innerText = "UPDATE COMMENT";
+    btn.style.background = "#e67e22";
+    
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
-function viewPost(key) {
+async function deleteComment(postKey, commentId) {
+    if (!confirm("Are you sure you want to delete this comment?")) return;
+    try {
+        await db.ref(`posts/${postKey}/comments/${commentId}`).remove();
+        alert("Comment deleted.");
+        viewPost(postKey, true); // 위치 유지하며 갱신
+    } catch (e) {
+        alert("Delete error: " + e.message);
+    }
+}
+
+function viewPost(key, isComment = false) {
     const p = staticPosts[key]; 
     if (!p) return;
-
     db.ref(`posts/${key}`).once('value', snap => {
         const d = snap.val() || {};
         const likes = d.likes || 0;
-        
         const hero = document.getElementById('mainHero');
+        
+        // 상세 페이지로 들어올 때만 헤더 변경
         if (hero) {
             hero.style.height = '40vh'; 
             hero.querySelector('.hero-title').innerText = p.title;
             hero.querySelector('.hero-subtitle').innerText = `${p.cat} • ${p.date}`;
         }
 
-        // 댓글 HTML 생성
         let commentsHtml = '';
         if (d.comments) {
-            Object.values(d.comments).forEach(c => {
+            Object.keys(d.comments).forEach(cKey => {
+                const c = d.comments[cKey];
+                const geoInfo = (c.ip && c.country) ? ` | IP: ${c.ip} (${c.country})` : '';
+                const isMyComment = (userIP && c.user === userIP);
+                const controlBtns = isMyComment ? `
+                    <div style="margin-left:10px; display:inline-flex; gap:5px;">
+                        <button onclick="editCommentMode('${c.text.replace(/'/g, "\\'")}', '${cKey}')" style="background:none; border:1px solid var(--primary-batik); color:var(--primary-batik); font-size:10px; padding:2px 5px; cursor:pointer; border-radius:3px;">Edit</button>
+                        <button onclick="deleteComment('${key}', '${cKey}')" style="background:none; border:1px solid #ff4757; color:#ff4757; font-size:10px; padding:2px 5px; cursor:pointer; border-radius:3px;">Delete</button>
+                    </div>` : '';
+
                 commentsHtml += `
-                    <div class="comment-item">
-                        <p class="comment-text">${c.text}</p>
-                        <small class="comment-date">${c.date}</small>
+                    <div class="comment-item" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding: 15px 0;">
+                        <p class="comment-text" style="margin-bottom: 8px;">${c.text}</p>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 5px; flex-wrap: wrap; align-items:center;">
+                            <span>${c.date}</span>
+                            <span>${geoInfo}</span>
+                            ${controlBtns}
+                        </div>
                     </div>`;
             });
         } else {
             commentsHtml = `<p id="noComment" style="color:var(--text-muted);">No comments yet.</p>`;
         }
 
-        // --- 추가된 기능: 다른 포스트 리스트 생성 ---
-        let otherPostsHtml = '<div class="other-posts-list" style="margin-top:40px; border-top:1px solid var(--border); padding-top:20px;">';
-        otherPostsHtml += '<h4 style="color:var(--primary-batik); margin-bottom:15px; font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">More Stories</h4>';
-        
-        Object.keys(staticPosts).reverse().forEach(otherKey => {
-            if (otherKey !== key) { // 현재 보고 있는 글은 제외
-                const op = staticPosts[otherKey];
-                otherPostsHtml += `
-                    <div class="other-post-item" onclick="viewPost('${otherKey}')" style="cursor:pointer; display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.95rem; transition:0.2s;">
-                        <span class="other-post-title" style="color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">• ${op.title}</span>
-                        <span style="color:var(--text-muted); font-size:0.8rem; flex-shrink:0; margin-left:10px;">${op.date}</span>
-                    </div>`;
-            }
-        });
-        otherPostsHtml += '</div>';
-
-        // 메인 컨테이너 업데이트
+        // 전체 UI 렌더링
         document.getElementById('postContainer').innerHTML = `
             <div class="post-detail-view" style="animation: fadeInUp 0.5s ease;">
-                <button class="btn-text" onclick="loadPosts()" style="margin-bottom:20px; display:flex; align-items:center; gap:5px; color:var(--primary-batik); background:none; border:none; cursor:pointer; font-weight:bold;">
+                <button class="btn-text" onclick="loadPosts(); window.scrollTo(0,0);" style="margin-bottom:20px; display:flex; align-items:center; gap:5px; color:var(--primary-batik); background:none; border:none; cursor:pointer; font-weight:bold;">
                     <i data-lucide="arrow-left"></i> Back to List
                 </button>
-                
                 <img src="${p.img}" style="width:100%; border-radius:15px; margin-bottom:30px; object-fit:cover; max-height:500px; border: 1px solid var(--border);">
-                
                 <div class="post-content" style="line-height:1.8; font-size:1.1rem; color:var(--text-main); margin-bottom:40px;">
                     ${p.desc}
                 </div>
-
                 <div style="text-align:center; margin-bottom:40px;">
                     <button onclick="handleLike('${key}')" class="btn-like">
                         <i data-lucide="heart"></i> <span id="detailLikeCount">${likes}</span>
                     </button>
+<button onclick="loadPosts(); window.scrollTo(0,0);" style="display:inline-flex; align-items:center; gap:8px; padding:12px 24px; background:transparent; border:1px solid var(--primary-batik); color:var(--primary-batik); border-radius:30px; cursor:pointer; font-weight:bold; font-size:0.9rem;">
+        <i data-lucide="list"></i> BACK TO LIST
+    </button>
                 </div>
-
                 <hr style="border:0; border-top:1px solid var(--border); margin:40px 0;">
-                
-                <section class="comment-section">
+                <section id="commentSection" class="comment-section"> 
                     <h3 style="font-family:'Playfair Display', serif; color:var(--primary-batik); margin-bottom:20px;">Comments</h3>
                     <div id="commentList" style="margin-bottom:30px;">
                         ${commentsHtml}
                     </div>
-
-                    <div class="comment-form" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:20px; border-radius:10px;">
+                    <div class="comment-form" id="commentFormAnchor" style="background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:20px; border-radius:10px;">
                         <div style="margin-bottom:10px; display:flex; gap:10px; font-size:1.2rem;">
                             <span style="cursor:pointer" onclick="addEmoji('😊')">😊</span>
                             <span style="cursor:pointer" onclick="addEmoji('😍')">😍</span>
                             <span style="cursor:pointer" onclick="addEmoji('👍')">👍</span>
                             <span style="cursor:pointer" onclick="addEmoji('🔥')">🔥</span>
-                            <span style="cursor:pointer" onclick="addEmoji('✨')">✨</span>
                         </div>
                         <textarea id="commentInput" rows="3" placeholder="Share your thoughts..." style="width:100%; background:transparent; border:none; color:white; outline:none; margin-bottom:10px;"></textarea>
-                        <button onclick="addComment('${key}')" class="btn-gold-full" style="width:100%; padding:12px; background:var(--primary-batik); border:none; color:black; font-weight:bold; border-radius:5px; cursor:pointer;">POST COMMENT</button>
-                        
-                        ${otherPostsHtml}
+                        <button id="commentSubmitBtn" onclick="addComment('${key}')" class="btn-gold-full" style="width:100%; padding:12px; background:var(--primary-batik); border:none; color:black; font-weight:bold; border-radius:5px; cursor:pointer;">POST COMMENT</button>
                     </div>
                 </section>
-
-                <div style="margin-top:50px; text-align:center;">
-                     <button class="btn-text" onclick="loadPosts()" style="display:inline-flex; align-items:center; gap:5px; color:var(--text-muted); background:none; border:1px solid #333; padding:10px 20px; border-radius:30px; cursor:pointer; transition:0.3s;">
-                        <i data-lucide="list"></i> Back to List
-                    </button>
-                </div>
             </div>
         `;
-
+        
         if (window.lucide) lucide.createIcons();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // [핵심 수정 부분]
+        if (isComment) {
+            // 댓글 작성/수정 시에는 해당 위치로 부드럽게 고정만 하고 위로 올리지 않음
+            const anchor = document.getElementById('commentSection');
+            if(anchor) anchor.scrollIntoView({ behavior: 'auto', block: 'center' });
+        } else {
+            // 새 포스트를 열 때만 맨 위로 이동
+            window.scrollTo(0, 0);
+        }
     });
 }
-
-// --- [좋아요 & 댓글 로직] ---
-
 function addEmoji(emoji) {
     document.getElementById('commentInput').value += emoji;
 }
@@ -289,59 +248,124 @@ function handleLike(postKey) {
     });
 }
 
-function addComment(postKey) {
+// --- 기존 addComment 함수를 아래 내용으로 교체하세요 ---
+async function addComment(postKey) {
     const text = document.getElementById('commentInput').value.trim();
     if (!text) return alert('Please enter your comment.');
+    
+    const btn = document.getElementById('commentSubmitBtn');
+    btn.disabled = true;
 
-    const commentCheckRef = db.ref(`posts/${postKey}/commentedBy/${userIP}`);
-    commentCheckRef.once('value', snap => {
-        if (snap.exists()) {
-            alert('You have already commented on this post. 🙏');
+    try {
+        // [추가] 동일 IP 중복 댓글 체크 (수정 모드가 아닐 때만)
+        if (!editingCommentId) {
+            const snap = await db.ref(`posts/${postKey}/comments`).once('value');
+            const existingComments = snap.val();
+            if (existingComments) {
+                const alreadyPosted = Object.values(existingComments).some(c => c.user === userIP);
+                if (alreadyPosted) {
+                    alert("You have already left a comment on this post. 🙏");
+                    btn.disabled = false;
+                    return;
+                }
+            }
+        }
+
+        let displayIp = "0.0.0.0", displayCountry = "Unknown";
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            const ipData = await res.json();
+            displayIp = ipData.ip;
+            displayCountry = ipData.country_name;
+        } catch (e) { console.error(e); }
+
+        const now = new Date();
+        const formattedDate = now.toLocaleString('ko-KR', {
+            year: 'numeric', month: 'numeric', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: true
+        });
+
+        const commentData = {
+            text: text,
+            date: editingCommentId ? formattedDate + " (edited)" : formattedDate,
+            user: userIP,
+            ip: displayIp,
+            country: displayCountry
+        };
+
+        if (editingCommentId) {
+            await db.ref(`posts/${postKey}/comments/${editingCommentId}`).update(commentData);
+            editingCommentId = null;
+            alert("Comment updated! ✨");
         } else {
-            const commentData = {
-                text: text,
-                date: new Date().toLocaleString(),
-                user: userIP
-            };
-            db.ref(`posts/${postKey}/comments`).push(commentData).then(() => {
-                commentCheckRef.set(true);
-                viewPost(postKey); 
-            });
+            await db.ref(`posts/${postKey}/comments`).push(commentData);
+            alert("Comment posted! 🙏");
+        }
+        
+        document.getElementById('commentInput').value = "";
+        btn.innerText = "POST COMMENT";
+        btn.style.background = "var(--primary-batik)";
+        btn.disabled = false;
+
+        viewPost(postKey, true);
+        
+    } catch (err) {
+        alert("Error: " + err.message);
+        btn.disabled = false;
+    }
+}
+
+// --- 1. TOP 버튼 생성 및 스크롤 로직 (기존 함수 유지) ---
+function createTopButton() {
+    // 이미 버튼이 있다면 생성하지 않음
+    if (document.getElementById('scrollToTopBtn')) return;
+
+    const topBtn = document.createElement('button');
+    topBtn.id = "scrollToTopBtn";
+    topBtn.innerHTML = "TOP";
+    topBtn.style.cssText = `
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: var(--primary-batik, #d4af37);
+        color: black;
+        border: none;
+        font-weight: bold;
+        font-size: 12px;
+        cursor: pointer;
+        display: none; /* 처음엔 숨김 */
+        z-index: 9999;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: 0.3s;
+    `;
+    
+    topBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.body.appendChild(topBtn);
+
+    // 스크롤 이벤트 감지
+    window.addEventListener('scroll', () => {
+        // 300px 이상 내려오면 버튼 보임
+        if (window.scrollY > 300) {
+            topBtn.style.display = "block";
+        } else {
+            topBtn.style.display = "none";
         }
     });
 }
 
-// --- [관리자 및 UI] ---
-
-function handleLogin() {
-    const id = document.getElementById('adminId').value;
-    const pw = document.getElementById('adminPw').value;
-    db.ref('adminInfo').once('value', snap => {
-        const admin = snap.val();
-        if (admin && id === admin.id && pw === admin.password) {
-            sessionStorage.setItem('admin', 'true');
-            updateUI();
-            closeModal('loginModal');
-        } else {
-            alert('Authentication failed.');
-        }
-    });
-}
-
-// 1. 로그인 핸들러 수정 (엔터 키 지원 및 저장 후 이동 보장)
 async function handleLogin() {
     const id = document.getElementById('adminId').value;
     const pw = document.getElementById('adminPw').value;
-
     try {
         const snap = await db.ref('adminInfo').once('value');
         const admin = snap.val();
-
         if (admin && id === admin.id && pw === admin.password) {
             sessionStorage.setItem('admin', 'true');
             closeModal('loginModal');
             updateUI();
-            // 메인 페이지 포스트 재로딩 (선택사항)
             if(typeof loadPosts === 'function') loadPosts();
         } else {
             alert('Invalid Credentials.');
@@ -350,16 +374,12 @@ async function handleLogin() {
         alert('Login Error: ' + e.message);
     }
 }
-
-// 2. 비밀번호 분실 시 힌트 제공 함수
 async function forgotPassword() {
     const inputId = prompt("Enter your Admin ID to get a security hint:");
     if (!inputId) return;
-
     try {
         const snap = await db.ref('adminInfo').once('value');
         const adminData = snap.val();
-
         if (adminData && inputId === adminData.id) {
             const hint = adminData.password.substring(0, 2);
             alert(`Verified. Your password starts with: [ ${hint} ]`);
@@ -370,32 +390,8 @@ async function forgotPassword() {
         alert("Error: " + err.message);
     }
 }
-
-
-// 비밀번호 힌트 기능 (로그인 전용)
-async function forgotPassword() {
-    const inputId = prompt("Please enter your Admin ID to get a security hint:");
-    if (!inputId) return;
-
-    try {
-        const snap = await db.ref('adminInfo').once('value');
-        const adminData = snap.val();
-
-        if (adminData && inputId === adminData.id) {
-            // 비밀번호 앞 2자리 힌트 제공
-            const hint = adminData.password.substring(0, 2);
-            alert(`Verified. Your Security Key starts with: [ ${hint} ]`);
-        } else {
-            alert("Incorrect Admin ID. Access Denied.");
-        }
-    } catch (err) {
-        alert("Error fetching data: " + err.message);
-    }
-}
-
 function logout() {
     if (confirm("Are you sure you want to sign out?")) {
-        // 1. Firebase Authentication Sign-out (if applicable)
         if (firebase.auth) {
             firebase.auth().signOut().then(() => {
                 console.log("Firebase Auth signed out.");
@@ -403,21 +399,15 @@ function logout() {
                 console.error("Sign out error:", error);
             });
         }
-
-        // 2. Clear browser storage data (Admin session, etc.)
-        sessionStorage.clear(); // Clear all session storage
-        localStorage.removeItem('admin'); // Remove specific admin flag from local storage
-        
-        // 3. Update UI and redirect to the main page
+        sessionStorage.clear();
+        localStorage.removeItem('admin');
         window.location.href = 'index.html'; 
     }
 }
-
 function updateUI() {
     const auth = sessionStorage.getItem('admin') === 'true';
     const adminControls = document.getElementById('adminControls');
     const loginBtn = document.getElementById('loginBtn');
-    
     if (auth) {
         if(adminControls) adminControls.style.display = 'flex';
         if(loginBtn) loginBtn.style.display = 'none';
@@ -433,11 +423,12 @@ function updateUI() {
         if(loginBtn) loginBtn.style.display = 'block';
     }
 }
-
-// --- [초기화] ---
+// 기존에 흩어져 있던 모든 window.onload를 삭제하고, 파일 맨 아래에 이 하나만 남기세요.
 window.onload = async () => {
-    await getUserIP(); 
-    loadPosts(); // JSON + Firebase 통합 로드
-    updateUI();
+    await getUserIP();      // IP 가져오기
+    await loadPosts();      // 포스트 로딩
+    updateUI();             // UI 업데이트 (관리자 체크)
+    createTopButton();      // 상단 이동 버튼 생성 (★이게 빠져있었습니다)
+    
     if (window.lucide) lucide.createIcons();
 };
