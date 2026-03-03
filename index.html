@@ -998,25 +998,15 @@
     </div>
 
     <!-- ── AI WELCOME ── -->
-    <div id="aiWelcomeModal">
-        <div class="ai-glass-card">
-            <div class="ai-card-inner">
-                <div class="ai-header">
-                    <div class="ai-icon-wrap">🤖</div>
-                    <div>
-                        <div class="ai-badge">// AI Concierge v2.0</div>
-                        <div class="ai-headline" id="aiHeadline">Welcome, Explorer!</div>
-                    </div>
-                </div>
-                <div class="ai-body">
-                    <div id="aiWelcomeContent">Initializing neural network...</div>
-                </div>
-                <button class="ai-close-btn" onclick="closeAiWelcome()">
-                    ▶ START READING
-                </button>
-            </div>
-        </div>
+<div id="aiWelcomeModal" class="modal-overlay">
+    <div class="modal-content">
+        <h2 style="color:var(--primary-batik); font-family:'Space Mono'; font-size:0.9rem; margin-bottom:15px;">
+            // AI Concierge v2.0 Welcome, Explorer!
+        </h2>
+        <div id="aiWelcomeContent" class="ai-text-area"></div>
+        <button onclick="closeAiWelcome()" class="btn-gold-full">START EXPLORING</button>
     </div>
+</div>
 
     <!-- ── SCRIPTS ── -->
     <script src="assets/js/app.js"></script>
@@ -1085,49 +1075,85 @@
         }
 
         /* ── AI Welcome ── */
-        async function startWelcomeAI() {
-            const modal    = document.getElementById('aiWelcomeModal');
-            const content  = document.getElementById('aiWelcomeContent');
-            const headline = document.getElementById('aiHeadline');
-            if (modal) modal.style.display = 'flex';
+async function startWelcomeAI() {
+    const modal = document.getElementById('aiWelcomeModal');
+    const headline = document.getElementById('aiHeadline');
+    const content = document.getElementById('aiWelcomeContent');
+    
+    modal.style.display = 'flex';
+    content.innerText = "Analyzing visitor context & Jakarta weather...";
 
-            let countryName = "our Global Explorer";
+    let countryName = "Global Explorer";
+    let countryCode = "";
+    let welcomeLang = "English"; 
+    let weatherInfo = "Unknown";
 
-            try {
-                const geoRes = await fetch("https://freeipapi.com/api/json");
-                if (geoRes.ok) {
-                    const geoData = await geoRes.json();
-                    countryName = geoData.countryName || countryName;
-                    if (headline) headline.textContent = `Signal from ${countryName}`;
-                }
-            } catch { console.warn("Geo-IP failed."); }
-
-            try {
-                const snap    = await db.ref('adminInfo').once('value');
-                const aData   = snap.val();
-                const apiKey  = aData?.LLMAPIkey;
-                if (!apiKey) throw new Error("API Key not found in Firebase.");
-
-                const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    body: JSON.stringify({
-                        model: "llama-3.3-70b-versatile",
-                        messages: [{
-                            role: "system",
-                            content: `You are a Jakarta AI travel concierge. Write a short, warm 2-3 sentence welcome for a visitor from ${countryName}. Use one relevant emoji.`
-                        }],
-                        temperature: 0.75
-                    })
-                });
-                if (!res.ok) { const e = await res.json(); console.error("AI Error:", e); throw new Error(`${res.status}`); }
-                const data = await res.json();
-                typeWriter(data.choices[0].message.content, content);
-            } catch (e) {
-                console.error("AI Briefing Error:", e);
-                typeWriter(`Welcome to Jakarta Journal! 🌴\nExplore curated stories of heritage and high-rises. We're glad you're here, ${countryName}!`, content);
-            }
+    try {
+        // 1. 위치 정보와 자카르타 날씨를 동시에 조회
+        const [geoRes, weatherRes] = await Promise.all([
+            fetch('https://ipapi.co/json/'),
+            fetch('https://api.open-meteo.com/v1/forecast?latitude=-6.2088&longitude=106.8456&current_weather=true')
+        ]);
+        
+        const geo = await geoRes.json();
+        const weatherData = await weatherRes.json();
+        
+        countryName = geo.country_name || "Global Explorer";
+        countryCode = geo.country_code || "";
+        
+        // 날씨 텍스트 구성
+        if (weatherData.current_weather) {
+            weatherInfo = `${weatherData.current_weather.temperature}°C`;
         }
+
+        // 2. 국가별 언어 설정
+        if (countryCode === 'ID') welcomeLang = "Indonesian";
+        else if (countryCode === 'KR') welcomeLang = "Korean";
+        else welcomeLang = "English";
+
+        headline.innerText = `Welcome, Explorer from ${countryName}!`;
+
+        // 3. OpenAI API 호출 - 인삿말, 농담, 명언, 날씨 포함 요청
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer YOUR_OPENAI_API_KEY` 
+            },
+            body: JSON.stringify({
+                model: "gpt-3.5-turbo",
+                messages: [{
+                    role: "system",
+                    content: `You are a friendly Jakarta concierge. Format your response exactly like this in ${welcomeLang}:
+                    1. Greeting: Warm welcome to a visitor from ${countryName}.
+                    2. Jakarta Weather: Mention that current Jakarta temperature is ${weatherInfo}.
+                    3. Quote: A short inspirational quote about travel or heritage.
+                    4. Joke: A very short, clean joke.
+                    Keep it concise and use emojis.`
+                }],
+                temperature: 0.8
+            })
+        });
+
+        if (!response.ok) throw new Error("AI Service Unavailable");
+        const data = await response.json();
+        typeWriter(data.choices[0].message.content, content);
+
+    } catch (e) {
+        console.error("AI Briefing Error:", e);
+        
+        // 4. API 실패 시 폴백 메시지 (날씨 포함)
+        let fallbackMsg = `[Greeting] Welcome! We're glad you're here from ${countryName}.\n[Weather] Jakarta is currently ${weatherInfo}.\n[Quote] "Travel makes one modest."\n[Joke] Why did the computer show up late? It had a hard drive!`;
+        
+        if (countryCode === 'KR') {
+            fallbackMsg = `[인사] 자카르타 저널에 오신 것을 환영합니다! ${countryName}에서 오신 방문객님 반가워요.\n[날씨] 현재 자카르타는 ${weatherInfo}입니다.\n[명언] "여행은 인간을 겸손하게 만든다."\n[농담] 세상에서 가장 뜨거운 바다는? 열바다!`;
+        } else if (countryCode === 'ID') {
+            fallbackMsg = `[Salam] Selamat datang di Jakarta Journal! Senang melihat Anda dari ${countryName}.\n[Cuaca] Suhu Jakarta saat ini ${weatherInfo}.\n[Kutipan] "Petualangan adalah cara terbaik untuk belajar."\n[Candaan] Kenapa ayam seberang jalan? Karena mau ke rumah pak RT!`;
+        }
+        
+        typeWriter(fallbackMsg, content);
+    }
+}
 
         function typeWriter(text, element) {
             let i = 0;
